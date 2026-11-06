@@ -1,0 +1,25 @@
+gr4-rwt Red Wire Technologies Hardware License
+
+Copyright (c) 2026 Red Wire Technologies
+
+1. Grant. Red Wire Technologies, the copyright holder, grants you this
+   license. When the Software is used with Red Wire Technologies Hardware,
+   you may use, reproduce, modify and distribute it under the terms of the
+   Apache License, Version 2.0 (LICENSE.Apache-2.0), subject to section 2.
+
+2. Field of use. This grant covers only use of the Software, and of works
+   derived from it, with Red Wire Technologies Hardware. Software or a
+   derivative work distributed under this license must carry this file, and
+   the recipient's rights under it are limited in the same way.
+
+3. Red Wire Technologies Hardware means hardware designed, made or sold by
+   Red Wire Technologies, such as the Oxygen SDR. Software is used with it
+   when it runs on that hardware or controls or exchanges data with it.
+
+4. Other use. Any other use of the Software is licensed only under the GNU
+   General Public License, version 3 or (at your option) any later version
+   (LICENSE.GPL-3.0).
+
+5. The GNU General Public License option is always available. You may
+   choose it instead of this license for any use, including use with Red
+   Wire Technologies Hardware.

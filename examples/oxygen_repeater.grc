@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: LicenseRef-RWT-Hardware-Apache-2.0 OR GPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Red Wire Technologies
+# RX -> TX repeater on the RWT Oxygen, the GNU Radio 4 version of a gr-rwt
+# rwt_source -> rwt_sink flowgraph. Runs on the Oxygen itself (local mode,
+# "default" FPGA personality; needs root for the FPGA registers):
+#
+#   rungraph --graph oxygen_repeater.grc --plugin-dir <dir with libGrGr4RwtRwtBlocksShared.so>
+#
+# Every setting can be overridden on the command line, e.g.
+#   rungraph ... -s 'rx.frequency=!!float64 433.92e6' -s 'tx.attenuation1=!!float64 30'
+blocks:
+  - id: gr::rwt::RWTSource<complex<float32>>
+    parameters:
+      name: rx
+      sample_rate: !!float32 2500000
+      frequency: !!float64 915e6
+      bandwidth: !!float64 2e6
+      gain_mode: slow_attack
+      rf_port1: A_BALANCED
+  - id: gr::rwt::RWTSink<complex<float32>>
+    parameters:
+      name: tx
+      sample_rate: !!float32 2500000
+      frequency: !!float64 916e6
+      bandwidth: !!float64 2e6
+      attenuation1: !!float64 40
+      rf_port1: A
+connections:
+  - [rx, out, tx, in]

@@ -1,0 +1,6 @@
+SPDX-License-Identifier: GPL-2.0-or-later
+SPDX-FileCopyrightText: Analog Devices, Inc. and the libiio contributors
+
+From libiio v1.0.0, tests/resources/xmls/fmcomms2.xml. libiio releases its tests
+under GPL-2.0-or-later (its library under LGPL-2.1-or-later). Used only by the
+tests, unmodified.

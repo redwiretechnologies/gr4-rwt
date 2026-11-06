@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: LicenseRef-RWT-Hardware-Apache-2.0 OR GPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Red Wire Technologies
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(gnuradio4 CONFIG)
+
+# The block headers talk to the radio through libiio v1 (and optionally libad9361),
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
+find_dependency(LibIIO 1.0)
+# and to the Oxygen management API through cpp-httplib
+include("${CMAKE_CURRENT_LIST_DIR}/Gr4RwtHttplib.cmake")
+set(GR4_RWT_USE_AD9361 @GR4_RWT_USE_AD9361@)
+if(GR4_RWT_USE_AD9361 AND NOT TARGET LibAD9361::ad9361)
+  find_dependency(LibAD9361)
+  add_library(LibAD9361::ad9361 UNKNOWN IMPORTED)
+  set_target_properties(LibAD9361::ad9361 PROPERTIES
+    IMPORTED_LOCATION "${LibAD9361_LIBRARIES}"
+    INTERFACE_INCLUDE_DIRECTORIES "${LibAD9361_INCLUDE_DIRS}"
+    INTERFACE_COMPILE_DEFINITIONS "GR4_RWT_HAS_AD9361=1")
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/gr4_rwtTargets.cmake")
+
+check_required_components(gr4_rwt)

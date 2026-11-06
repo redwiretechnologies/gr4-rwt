@@ -1,0 +1,24 @@
+gr4-rwt is dual licensed.
+
+Copyright (c) 2026 Red Wire Technologies
+
+* Used with Red Wire Technologies hardware (such as the Oxygen SDR): the
+  terms of the Apache License, Version 2.0, limited to that use, as set out
+  in LICENSE.RWT-Hardware. The Apache License text is in LICENSE.Apache-2.0.
+
+* Any other use: the GNU General Public License, version 3 or (at your
+  option) any later version, in LICENSE.GPL-3.0.
+
+The GNU General Public License option is always available, also for use
+with Red Wire Technologies hardware.
+
+SPDX-License-Identifier: LicenseRef-RWT-Hardware-Apache-2.0 OR GPL-3.0-or-later
+
+Files with their own licenses:
+* blocks/rwt/test/data/fmcomms2.xml: from libiio v1.0.0's test resources,
+  GPL-2.0-or-later (libiio's license for its tests), used only by the
+  tests, unmodified (see fmcomms2.xml.license).
+* cmake/Modules/FindLibAD9361.cmake: BSD-3-Clause, as its header states.
+
+Each file carries an SPDX-License-Identifier header, or a <file>.license
+file next to it where it cannot carry a comment.
