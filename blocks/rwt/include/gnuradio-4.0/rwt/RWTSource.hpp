@@ -9,8 +9,8 @@
 #include <gnuradio-4.0/thread/thread_pool.hpp>
 
 #include <gnuradio-4.0/rwt/detail/BlockSupport.hpp>
-#include <gnuradio-4.0/rwt/detail/Oxygen.hpp>
-#include <gnuradio-4.0/rwt/detail/RadioApi.hpp>
+#include <gnuradio-4.0/rwt/detail/RWTRadio.hpp>
+#include <gnuradio-4.0/rwt/detail/HardwareManager.hpp>
 #include <gnuradio-4.0/rwt/detail/Streams.hpp>
 
 #include <array>
@@ -31,18 +31,18 @@ GR_REGISTER_BLOCK("gr::rwt::RWTDualSource", gr::rwt::RWTDualSource, [T], [ std::
 template<typename T, std::size_t nPorts = 1UZ>
 requires((std::is_same_v<T, std::complex<float>> || std::is_same_v<T, std::int16_t>) && (nPorts == 1UZ || nPorts == 2UZ))
 struct RWTSource : Block<RWTSource<T, nPorts>> {
-    using Description = Doc<R"(RWT Oxygen SDR source (AD9361 receiver), the GNU Radio 4 counterpart of gr-rwt's rwt_source.
+    using Description = Doc<R"(RWT radio source (AD9361 receiver; the Oxygen and other Red Wire Technologies SDRs), the GNU Radio 4 counterpart of gr-rwt's rwt_source.
 
 RWTSource receives one channel (`channel` picks RX1 or RX2); RWTDualSource receives both, port 0 = RX1, port 1 = RX2.
 std::complex<float> ports are scaled so the AD9361's 12-bit full scale is 1.0; std::int16_t ports carry raw interleaved I,Q.
 
-mode "local" (default when uri is empty) runs on the Oxygen with the "default" FPGA personality, as gr-rwt does: it loads the
+mode "local" (default when uri is empty) runs on the radio itself with the "default" FPGA personality, as gr-rwt does: it loads the
 personality with fpgaloader, maps the FPGA registers from /dev/mem (root), and decodes the FPGA's in-band tags:
   FPGA time     -> gr:trigger_name "RWT_TIME", gr:trigger_time [ns] = sample index / sample_rate, rwt:sample_index
   FPGA PPS      -> gr:trigger_name "RWT_PPS", rwt:pps (and gr:trigger_time while the time is known)
   FPGA overflow -> gr:rx_overflow = true, rwt:overflow; trigger times resume at the next FPGA time tag
 Below 600 kS/s the AD9361 runs at sample_rate x 10^n and the FPGA CIC decimates by 10^n (n <= 5), down to 6 S/s.
-mode "remote" streams from an Oxygen running the "griio" personality over libiio (uri "ip:<host>"), without FPGA tags.
+mode "remote" streams from an RWT radio running the "griio" personality over libiio (uri "ip:<host>"), without FPGA tags.
 
 The first samples, and the first after a sample_rate or frequency change, carry gr:sample_rate and gr:frequency tags.
 (Before gnuradio4-core c145ebc the gr: keys are written without the domain, as that core spells them.))">;
@@ -52,7 +52,7 @@ The first samples, and the first after a sample_rate or frequency change, carry 
     TPortType out;
 
     // device
-    Annotated<std::string, "uri", Visible, Doc<"libiio context URI; empty = this Oxygen (local:)">>                    uri;
+    Annotated<std::string, "uri", Visible, Doc<"libiio context URI; empty = this radio (local:)">>                    uri;
     Annotated<std::string, "mode", Doc<"local (default FPGA personality, tags) or remote (griio); empty = by uri">>       mode;
     // RF (gr-rwt rwt_source parameters)
     Annotated<float, "sample_rate", Unit<"Hz">, Visible, Doc<"RX sample rate; below 600 kS/s the FPGA CIC decimates">>    sample_rate = 5'000'000.f;
@@ -69,8 +69,8 @@ The first samples, and the first after a sample_rate or frequency change, carry 
     Annotated<std::string, "filter", Doc<"AD9361 .ftr FIR file (RX and TX); used when auto_filter is off">>                filter;
     Annotated<bool, "auto_filter", Doc<"load a FIR matching the rate (libad9361)">>                                        auto_filter = true;
     Annotated<std::string, "extra", Doc<"gr-rwt extra settings: comma-separated key=value (gr-rwt keys or AD9361 attributes)">> extra;
-    // Oxygen management API (http://<radio>/docs): connection_control sets the RX frequency with the RF path's filters
-    Annotated<std::string, "api_url", Doc<"management API base URL; empty = this Oxygen (local) or the uri's host (ip:), none = off">> api_url;
+    // RWT Hardware Manager (http://<radio>/docs): connection_control sets the RX frequency with the RF path's filters, and switches the RX paths on at start and off at stop
+    Annotated<std::string, "api_url", Doc<"RWT Hardware Manager base URL; empty = this radio (local) or the uri's host (ip:), none = off">> api_url;
     // an integer, not a string: gr-studio writes it unquoted, and GR4 refuses an integer for a string setting
     Annotated<gr::Size_t, "api_transceiver", Doc<"connection_control transceiver: N = TransceiverN (0 on an Oxygen)">>       api_transceiver = 0U;
     // FPGA ("default" personality, local mode)
@@ -96,9 +96,10 @@ The first samples, and the first after a sample_rate or frequency change, carry 
 
     GR_MAKE_REFLECTABLE(RWTSource, out, uri, mode, sample_rate, frequency, bandwidth, channel, rf_port1, rf_port2, gain_mode, gain, quadrature, rfdc, bbdc, filter, auto_filter, extra, api_url, api_transceiver, use_tags, escape, use_ext_pps, correction_enable, bypass_enable, decimation_arbitrary, time_now, time_next_pps, personality, load_fpga, force_reload, base_addr, check_blkid, buffer_size, num_buffers, max_chunk_size, timeout_us, n_samples_max);
 
-    detail::Oxygen                    _dev;
+    detail::RWTRadio                    _dev;
     std::string                       _startError; // why the last start() failed; empty while it holds the radio
-    detail::RadioApi                  _api;        // the management API, when api_url resolves to one
+    detail::HardwareManager                  _hwm;        // the RWT Hardware Manager, when api_url resolves to one
+    detail::PathEnables               _rxOn{detail::Direction::RX}; // RX paths this block switched on through the RWT Hardware Manager
     std::unique_ptr<detail::RxStream> _rx;
     std::vector<std::size_t>          _channels;
     double                            _rate   = 0.0; // effective RX rate (after the CIC)
@@ -123,6 +124,7 @@ The first samples, and the first after a sample_rate or frequency change, carry 
                 self->requestStop();
             }
             gr::atomic_ref(self->_ioThreadDone).wait(false);
+            self->setReceive(false); // a block destroyed without stop() leaves no RX path on
         }
     };
     IoThreadGuard _ioGuard{this};
@@ -157,13 +159,13 @@ The first samples, and the first after a sample_rate or frequency change, carry 
         }
     }
 
-    /// the RX frequency through the management API's connection_control, which also sets the RF path's
-    /// filters, for each RX path the block uses; through libiio (AD9361 LO alone) without the API or if it fails
+    /// the RX frequency through the RWT Hardware Manager's connection_control, which also sets the RF path's
+    /// filters, for each RX path the block uses; through libiio (AD9361 LO alone) without the RWT Hardware Manager or if it fails
     void applyFrequency() {
-        if (_api.enabled()) {
+        if (_hwm.enabled()) {
             bool ok = true;
             for (const std::size_t ch : _channels) {
-                if (const std::string err = _api.setFrequency(detail::Direction::RX, ch, frequency); !err.empty()) {
+                if (const std::string err = _hwm.setFrequency(detail::Direction::RX, ch, frequency); !err.empty()) {
                     _dev.warn(err);
                     ok = false;
                 }
@@ -171,9 +173,19 @@ The first samples, and the first after a sample_rate or frequency change, carry 
             if (ok) {
                 return;
             }
-            _dev.warn("the management API did not take the RX frequency; setting the AD9361 LO through libiio");
+            _dev.warn("the RWT Hardware Manager did not take the RX frequency; setting the AD9361 LO through libiio");
         }
         _dev.setLo(detail::Direction::RX, frequency);
+    }
+
+    /// RWT Hardware Manager receive_enable for the block's RX paths: on at start, off when the block
+    /// stops, fails to start, or is destroyed. Only paths this block switched on are switched off.
+    void setReceive(bool on) {
+        if (on) {
+            _rxOn.on(_hwm, _channels, [this](const std::string& msg) { _dev.warn(msg); });
+        } else {
+            _rxOn.off(_hwm, [this](const std::string& msg) { std::println(stderr, "{}: {}", this->name.value, msg); });
+        }
     }
 
     /// a setting the radio cannot take: start() fails with it, a live change is refused (settingsChanged)
@@ -222,9 +234,9 @@ The first samples, and the first after a sample_rate or frequency change, carry 
         try {
             const detail::Mode m = detail::parseMode(mode, uri);
             _dev.warn            = [this](const std::string& msg) { std::println(stderr, "{}: {}", this->name.value, msg); };
-            _dev.open(detail::OxygenConfig{uri, m, personality, load_fpga, force_reload, base_addr, check_blkid});
-            _api.configure(detail::resolveApiUrl(api_url, m, uri), static_cast<std::size_t>(api_transceiver.value));
-            _api.trace = [this](const std::string& msg) {
+            _dev.open(detail::RWTRadioConfig{uri, m, personality, load_fpga, force_reload, base_addr, check_blkid});
+            _hwm.configure(detail::resolveHardwareManagerUrl(api_url, m, uri), static_cast<std::size_t>(api_transceiver.value));
+            _hwm.trace = [this](const std::string& msg) {
                 if (detail::traceEnabled()) {
                     std::println(stderr, "{}: {}", this->name.value, msg);
                 }
@@ -245,6 +257,7 @@ The first samples, and the first after a sample_rate or frequency change, carry 
                 throw std::invalid_argument(_rejected.front().second);
             }
             _dev.setTagConfig(detail::Direction::RX, escape, use_tags);
+            setReceive(true);
 
             _rx = std::make_unique<detail::RxStream>(_dev.streamDevice(detail::Direction::RX), detail::StreamConfig{m, _channels, buffer_size, num_buffers, escape, use_tags});
             if (const int r = _rx->activate(); r < 0) {
@@ -255,6 +268,7 @@ The first samples, and the first after a sample_rate or frequency change, carry 
             std::println(stderr, "{}: start failed: {}", this->name.value, _startError);
             this->emitErrorMessage("start()", e.what());
             _rx.reset();
+            setReceive(false);
             _dev.close();
             this->requestStop();
             return;
@@ -270,6 +284,7 @@ The first samples, and the first after a sample_rate or frequency change, carry 
             gr::atomic_ref(_ioThreadDone).wait(false);
         }
         _rx.reset();
+        setReceive(false);
         _dev.close();
     }
 
