@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-RWT-Hardware-Apache-2.0 OR GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Red Wire Technologies
-// qa_Example.cpp — runs examples/oxygen_repeater.grc with GR4's rungraph, pointed at the emulator
+// qa_Example.cpp — runs examples/rwt_repeater.grc with GR4's rungraph, pointed at the emulator
 #include <boost/ut.hpp>
 
 #include "EmuFixture.hpp"
@@ -16,7 +16,7 @@
 #error "GR4_RWT_RUNGRAPH must name the rungraph executable"
 #endif
 #ifndef GR4_RWT_EXAMPLE
-#error "GR4_RWT_EXAMPLE must name examples/oxygen_repeater.grc"
+#error "GR4_RWT_EXAMPLE must name examples/rwt_repeater.grc"
 #endif
 #ifndef GR4_RWT_PLUGIN_DIR
 #error "GR4_RWT_PLUGIN_DIR must name the directory of the block library"
@@ -46,7 +46,7 @@ const boost::ut::suite<"example graph"> exampleTests = [] {
         return;
     }
 
-    "oxygen_repeater.grc runs under rungraph and repeats RX to TX"_test = [] {
+    "rwt_repeater.grc runs under rungraph and repeats RX to TX"_test = [] {
         EmuFixture                emu;
         std::vector<std::int16_t> rx;
         for (int i = 0; i < 64; ++i) {

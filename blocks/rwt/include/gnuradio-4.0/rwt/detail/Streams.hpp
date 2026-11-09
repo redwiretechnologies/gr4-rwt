@@ -3,7 +3,7 @@
 #ifndef GNURADIO_RWT_DETAIL_STREAMS_HPP
 #define GNURADIO_RWT_DETAIL_STREAMS_HPP
 
-// RX and TX sample streams of the RWT Oxygen.
+// RX and TX sample streams of an RWT radio.
 //
 // Local mode carries gr-rwt's packed format (see Wire.hpp): RX in-band tags are
 // returned as events at the sample offset they precede, TX events are encoded
@@ -12,7 +12,7 @@
 // per channel.
 
 #include <gnuradio-4.0/rwt/detail/Iio.hpp>
-#include <gnuradio-4.0/rwt/detail/Oxygen.hpp>
+#include <gnuradio-4.0/rwt/detail/RWTRadio.hpp>
 #include <gnuradio-4.0/rwt/detail/Wire.hpp>
 
 #include <atomic>

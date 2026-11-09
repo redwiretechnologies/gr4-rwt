@@ -3,7 +3,7 @@
 
 # gr4-rwt
 
-GNU Radio 4 out-of-tree module for the [Red Wire Technologies](https://redwiretechnologies.us) **Oxygen** SDR: source and sink blocks equivalent to the ones in [gr-rwt](https://github.com/redwiretechnologies/gr-rwt), written for GR4's C++23 block API.
+GNU Radio 4 out-of-tree module for **RWT radios**, the [Red Wire Technologies](https://redwiretechnologies.us) SDRs such as the Oxygen: source and sink blocks equivalent to the ones in [gr-rwt](https://github.com/redwiretechnologies/gr-rwt), written for GR4's C++23 block API.
 
 The project was scaffolded with [gr4_modtool](https://github.com/gnuradio/gnuradio4-modtool) (`newmod`, `newblock --spec`), and `gr4_modtool check` passes. The radio code is shared with SoapyRWT, the SoapySDR module for the same radio: gr-rwt's packed sample format and FPGA registers, on libiio v1.
 
@@ -31,7 +31,7 @@ graph.connect<"out", "in">(rx, tx);
 
 | | `mode: local` (default when `uri` is empty) | `mode: remote` |
 |---|---|---|
-| Runs | on the Oxygen, like gr-rwt | on a host, against an Oxygen with the `griio` personality (`uri: ip:<host>`) |
+| Runs | on the RWT radio itself, like gr-rwt | on a host, against an RWT radio with the `griio` personality (`uri: ip:<host>`) |
 | FPGA | `default` personality, loaded with `fpgaloader`; registers mapped from `/dev/mem` (root) | — |
 | Samples | gr-rwt's packed 64-bit words with in-band tags | standard AD9361 layout |
 | RX timestamps, PPS, overflow tags | yes | no |
@@ -44,7 +44,7 @@ Names and defaults follow gr-rwt's GRC blocks. RF and FPGA settings can be chang
 
 | gr-rwt | GR4 setting | Notes |
 |---|---|---|
-| `freq` | `frequency` | RX/TX frequency, through the Oxygen management API's `connection_control` (see below); shared by both channels |
+| `freq` | `frequency` | RX/TX frequency, through the RWT Hardware Manager's `connection_control` (see below); shared by both channels |
 | `samplerate` | `sample_rate` | float, Hz. RX uses the CIC below 600 kS/s (local mode). RX and TX share the AD9361 clock. |
 | `bandwidth` | `bandwidth` | |
 | `rfport1`, `rfport2` | `rf_port1`, `rf_port2` | RX `A_BALANCED`…, TX `A`/`B` |
@@ -58,26 +58,28 @@ Names and defaults follow gr-rwt's GRC blocks. RF and FPGA settings can be chang
 | `use_ext_pps`, `time_now`, `time_next_pps` | same (source) | time strings are `"secs,nsecs"` |
 | `base_addr`, `force_reload`, `buffer_size` | same | `base_addr: 0` skips the FPGA registers (emulation) |
 | — | `uri`, `mode`, `personality`, `load_fpga`, `check_blkid` | device selection, as in SoapyRWT |
-| — | `api_url`, `api_transceiver` | the Oxygen management API (below): empty `api_url` picks it from the radio, `none` turns it off; `api_transceiver` N selects `TransceiverN`: `0` (Transceiver0) on an Oxygen, `1` for Transceiver1 on radios that have one |
+| — | `api_url`, `api_transceiver` | the RWT Hardware Manager (below): empty `api_url` picks it from the radio, `none` turns it off; `api_transceiver` N selects `TransceiverN`: `0` (Transceiver0) on an Oxygen, `1` for Transceiver1 on radios that have one |
 | — | `channel` | single-channel blocks: 0 = channel 1, 1 = channel 2 |
 | — | `num_buffers`, `max_chunk_size`, `timeout_us`, `n_samples_max` (source), `max_queued_chunks`, `mute_on_stop` (sink) | streaming |
 
 gr-rwt's `ctrl` message port is replaced by GR4's own mechanism, where settings can be changed through messages and tags. On gnuradio4-core before 9fda77c, a tag whose key matches a setting (`sample_rate`, `frequency`) updates a block that has not had that setting set explicitly (GR4's auto-update, as for GR4's SoapySink). From 9fda77c on, a setting follows a tag only when the application couples them, e.g. `block.settings().setTagCouplings({{"frequency", "gr:frequency"}})`.
 
-## Oxygen management API
+## RWT Hardware Manager
 
-The Oxygen runs a management API (FastAPI, `http://<radio>/docs`). The blocks use its `connection_control` endpoints, which configure a whole RF path rather than the AD9361 alone:
+RWT radios run the **RWT Hardware Manager**, the service that manages the radio's hardware, with a REST API (FastAPI, `http://<radio>/docs`). The blocks use its `connection_control` endpoints, which configure a whole RF path rather than the AD9361 alone:
 
 | When | Request |
 |---|---|
 | source start, and each `frequency` change | `PUT /api/connection_control/rx_freq/{transceiver}/{path}/{Hz}` for each RX path the block uses (RX0, RX1) |
+| source start, after the frequency | `PUT /api/connection_control/receive_enable/{transceiver}/{path}/true` |
+| source stop, failed start, or destruction | `PUT .../receive_enable/{transceiver}/{path}/false` for the paths it switched on |
 | sink start, and each `frequency` change | `PUT /api/connection_control/tx_freq/{transceiver}/{path}/{Hz}` for each TX path (TX0, TX1) |
 | sink start, after the frequency | `PUT /api/connection_control/transmit_enable/{transceiver}/{path}/true` |
 | sink stop, failed start, or destruction | `PUT .../transmit_enable/{transceiver}/{path}/false` for the paths it switched on |
 
 `transceiver` is `Transceiver<api_transceiver>`: `Transceiver0` on an Oxygen (the default, `api_transceiver: 0`), `Transceiver1` with `api_transceiver: 1` on radios that have a second transceiver. The setting is an integer so that gr-studio's unquoted value loads. The path is the block's channel: a single-channel block uses `channel` (0 → RX0/TX0, 1 → RX1/TX1), a dual block both. The frequency is sent in Hz.
 
-`api_url` empty means `http://127.0.0.1` in local mode (the graph runs on the Oxygen), `http://<host>` for `uri: ip:<host>`, and no API for anything else (the emulator, USB). `none` turns it off; any other value is used as the base URL. Without the API, or when a frequency request fails, the block sets the AD9361 LO through libiio as before and says so on stderr. A `transmit_enable` that fails is reported on stderr and the block keeps running. With `GR4_RWT_TRACE=1` each request and its reply are printed.
+`api_url` empty means `http://127.0.0.1` in local mode (the graph runs on the radio), `http://<host>` for `uri: ip:<host>`, and no RWT Hardware Manager for anything else (the emulator, USB). `none` turns it off; any other value is used as the base URL. Without the RWT Hardware Manager, or when a frequency request fails, the block sets the AD9361 LO through libiio as before and says so on stderr. A `receive_enable` or `transmit_enable` that fails is reported on stderr, the block keeps running, and that path is not switched off later. The setting names keep the `api_` prefix so that saved graphs still load. With `GR4_RWT_TRACE=1` each request and its reply are printed.
 
 Needs [cpp-httplib](https://github.com/yhirose/cpp-httplib) (header-only).
 
@@ -111,7 +113,7 @@ Requirements:
 * GNU Radio 4 (`gnuradio4-core`), developed against 4.0.0-RC3 (core `6c917fa`); also tested with meta-sdr's `6b40a37`, with `83d15cc` (Oct 22, 2026), with `86457be` (Oct 28, 2026) and gnuradio4-blocks `7c9d119`, and with `2d3481c` (Nov 2, 2026) and gnuradio4-blocks `46b99b5` (Nov 3, 2026), the first with `domain:name` tag keys. The tests use gnuradio4-blocks' testing blocks under `gr::blocks::testing`; the `gr::testing` alias was removed in gnuradio4-blocks `a9cc695`. This needs GCC 14+ (GCC 15 recommended) or Clang 20+.
 * **libiio ≥ 1.0** ([v1.0.0](https://github.com/analogdevicesinc/libiio/releases/tag/v1.0.0)). Build it with `WITH_EMU_BACKEND=ON` to run the emulator tests.
 * libad9361, optional but recommended for low rates. Released versions are built on libiio 0.x and are skipped with a warning; use the libiio v1 port, branch [`staging/libiio1-support`](https://github.com/analogdevicesinc/libad9361-iio/tree/staging/libiio1-support). Set with `-DENABLE_LIBAD9361=AUTO|ON|OFF`.
-* [cpp-httplib](https://github.com/yhirose/cpp-httplib), header-only, for the Oxygen management API.
+* [cpp-httplib](https://github.com/yhirose/cpp-httplib), header-only, for the RWT Hardware Manager.
 * Boost.UT, for the tests.
 
 ```sh
@@ -126,7 +128,7 @@ When the tests are installed and run somewhere else, for example as a Yocto ptes
 | Variable | Default |
 |---|---|
 | `GR4_RWT_TEST_DATA_DIR` | `blocks/rwt/test/data` in the source tree |
-| `GR4_RWT_TEST_EXAMPLE_FILE` | `examples/oxygen_repeater.grc` in the source tree |
+| `GR4_RWT_TEST_EXAMPLE_FILE` | `examples/rwt_repeater.grc` in the source tree |
 | `GR4_RWT_TEST_PLUGIN_DIR` | the block library's build directory |
 | `GR4_RUNGRAPH` | `rungraph` found next to GR4 |
 | `GR4_RWT_TEST_EXAMPLE` | `ON`; `OFF` skips `qa_Example` |
@@ -156,10 +158,10 @@ GR4 answers a Set on the `settings` endpoint (gr-studio's `immediate` mode) with
 
 ## Example
 
-`examples/oxygen_repeater.grc` is an RX→TX repeater for the Oxygen:
+`examples/rwt_repeater.grc` is an RX→TX repeater for an RWT radio:
 
 ```sh
-rungraph --graph examples/oxygen_repeater.grc --plugin-dir build/blocks/rwt
+rungraph --graph examples/rwt_repeater.grc --plugin-dir build/blocks/rwt
 ```
 
 ## Tests
@@ -170,17 +172,17 @@ rungraph --graph examples/oxygen_repeater.grc --plugin-dir build/blocks/rwt
 |---|---|
 | `qa_RWTSource` | source blocks in real GR4 graphs: FPGA time/overflow/PPS tags → GR4 tags at the right samples, a tag split across DMA blocks, escaped data, dual channel int16, remote mode RX2, error on a missing channel |
 | `qa_RWTSink` | sink blocks: exact TX words for `tx_sob`+`tx_time`…`tx_eob` bursts, `tx_sample`, escaping, a burst across 1-sample chunks, dual-port marker merging, `use_tags: false`, remote layout |
-| `qa_Oxygen` | wire format against gr-rwt's packing expressions, CIC rate planning, time conversions, every AD9361 control, the `extra` aliases, and the missing-`fpgaloader` error |
-| `qa_RadioApi` | the management API against a mock of its HTTP server: `Transceiver0`/`Transceiver1` from `api_transceiver`; `rx_freq`/`tx_freq` at start and on a live retune, for the paths in use; `transmit_enable` on at start (after the frequency) and off once at stop; the libiio fallback when the API fails or is unreachable; `api_url` resolution |
+| `qa_RWTRadio` | wire format against gr-rwt's packing expressions, CIC rate planning, time conversions, every AD9361 control, the `extra` aliases, and the missing-`fpgaloader` error |
+| `qa_HardwareManager` | the RWT Hardware Manager against a mock of its HTTP server: `Transceiver0`/`Transceiver1` from `api_transceiver`; `rx_freq`/`tx_freq` at start and on a live retune, for the paths in use; `receive_enable`/`transmit_enable` on at start (after the frequency) and off once at stop, and a refused path never switched off; the libiio fallback when the RWT Hardware Manager fails or is unreachable; `api_url` resolution |
 | `qa_Registry` | the compiled library registers all 4 blocks × 2 types; create by name with settings |
 | `qa_LiveSettings` | settings changed on running blocks the way gnuradio4-control-plane (gr-studio) sends them: `staged_settings` and `settings` messages through the scheduler reach the source and the sink, under GR4's Simple single- and multi-threaded schedulers, also for a sink with no input; an out-of-range `sample_rate` is refused without stopping the graph; an RX retune leaves the sink's TX frequency alone |
-| `qa_Example` | runs `examples/oxygen_repeater.grc` with GR4's `rungraph` and checks every RX sample reaches TX |
+| `qa_Example` | runs `examples/rwt_repeater.grc` with GR4's `rungraph` and checks every RX sample reaches TX |
 
-The radio is libiio v1's emulation backend with libiio's FMCOMMS2 description (`blocks/rwt/test/data/fmcomms2.xml`), the same AD9361 device chain as the Oxygen. The emulator serves RX blocks from a file and records TX blocks, so the tests check the exact bytes. All suites also pass under AddressSanitizer with leak detection and under ThreadSanitizer, and 25 repeated runs show no flakes. GCC's UndefinedBehaviorSanitizer cannot compile GR4's compile-time port names (`"out#0"`) at all, so UBSan needs Clang.
+The radio is libiio v1's emulation backend with libiio's FMCOMMS2 description (`blocks/rwt/test/data/fmcomms2.xml`), the same AD9361 device chain as the RWT radios. The emulator serves RX blocks from a file and records TX blocks, so the tests check the exact bytes. All suites also pass under AddressSanitizer with leak detection and under ThreadSanitizer, and 25 repeated runs show no flakes. GCC's UndefinedBehaviorSanitizer cannot compile GR4's compile-time port names (`"out#0"`) at all, so UBSan needs Clang.
 
 ## Status and assumptions
 
-Tested against the emulator only, **not yet run on an Oxygen**. Local mode's FPGA registers and `fpgaloader` cannot be emulated. These points should be confirmed on hardware; they are the same open questions as in SoapyRWT:
+Tested against the emulator only, **not yet run on an RWT radio**. Local mode's FPGA registers and `fpgaloader` cannot be emulated. These points should be confirmed on hardware; they are the same open questions as in SoapyRWT:
 
 1. **Sample index rate with the CIC.** FPGA times are converted with the user-facing RX rate (after the CIC), and TX `tx_time` with the TX rate.
 2. **`EOB` placement.** The EOB marker precedes the word that holds the burst's last sample. `SOB` and `HOLD` start a word of their own, padding a half-filled single-channel word with a zero sample.
@@ -209,6 +211,6 @@ gr4-rwt is © 2026 Red Wire Technologies and dual licensed (`LICENSE`):
 
 SPDX: `LicenseRef-RWT-Hardware-Apache-2.0 OR GPL-3.0-or-later`.
 
-The wire format and register handling are a reimplementation of the protocol gr-rwt (Red Wire Technologies) uses with the Oxygen's FPGA; no gr-rwt code is included. Two files keep their own licenses: `blocks/rwt/test/data/fmcomms2.xml`, from libiio v1.0.0's test resources (GPL-2.0-or-later, libiio's license for its tests; used only by the tests, unmodified), and `cmake/Modules/FindLibAD9361.cmake` (BSD-3-Clause, as its header states).
+The wire format and register handling are a reimplementation of the protocol gr-rwt (Red Wire Technologies) uses with the RWT radios' FPGA; no gr-rwt code is included. Two files keep their own licenses: `blocks/rwt/test/data/fmcomms2.xml`, from libiio v1.0.0's test resources (GPL-2.0-or-later, libiio's license for its tests; used only by the tests, unmodified), and `cmake/Modules/FindLibAD9361.cmake` (BSD-3-Clause, as its header states).
 
 Every file carries an `SPDX-License-Identifier` and `SPDX-FileCopyrightText` header, or, where it cannot carry a comment (`CMakePresets.json`, `fmcomms2.xml`), a `.license` file next to it, as [REUSE](https://reuse.software) does. The scaffold was generated by gr4_modtool (MIT).

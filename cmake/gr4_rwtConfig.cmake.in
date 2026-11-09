@@ -8,7 +8,7 @@ find_dependency(gnuradio4 CONFIG)
 # The block headers talk to the radio through libiio v1 (and optionally libad9361),
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
 find_dependency(LibIIO 1.0)
-# and to the Oxygen management API through cpp-httplib
+# and to the RWT Hardware Manager through cpp-httplib
 include("${CMAKE_CURRENT_LIST_DIR}/Gr4RwtHttplib.cmake")
 set(GR4_RWT_USE_AD9361 @GR4_RWT_USE_AD9361@)
 if(GR4_RWT_USE_AD9361 AND NOT TARGET LibAD9361::ad9361)

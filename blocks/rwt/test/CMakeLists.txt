@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Red Wire Technologies
 # Tests for rwt blocks
 #
-# qa_RWTSource, qa_RWTSink and qa_Oxygen run against libiio v1's emulated
+# qa_RWTSource, qa_RWTSink and qa_RWTRadio run against libiio v1's emulated
 # AD9361 (emu backend, libiio's FMCOMMS2 test description) and skip those
 # cases when libiio was built without WITH_EMU_BACKEND.
 #
@@ -17,30 +17,30 @@ target_compile_definitions(qa_RWTSource PRIVATE GR4_RWT_TEST_DATA_DIR="${GR4_RWT
 gr4_modtool_add_ut_test(qa_RWTSink qa_RWTSink.cpp)
 target_link_libraries(qa_RWTSink PRIVATE gr4_rwt::blocks_rwt_headers)
 target_compile_definitions(qa_RWTSink PRIVATE GR4_RWT_TEST_DATA_DIR="${GR4_RWT_TEST_DATA_DIR}")
-gr4_modtool_add_ut_test(qa_Oxygen qa_Oxygen.cpp)
-target_link_libraries(qa_Oxygen PRIVATE gr4_rwt::blocks_rwt_headers)
-target_compile_definitions(qa_Oxygen PRIVATE GR4_RWT_TEST_DATA_DIR="${GR4_RWT_TEST_DATA_DIR}")
+gr4_modtool_add_ut_test(qa_RWTRadio qa_RWTRadio.cpp)
+target_link_libraries(qa_RWTRadio PRIVATE gr4_rwt::blocks_rwt_headers)
+target_compile_definitions(qa_RWTRadio PRIVATE GR4_RWT_TEST_DATA_DIR="${GR4_RWT_TEST_DATA_DIR}")
 
 # settings sent as messages to running blocks, as gnuradio4-control-plane sends them
 gr4_modtool_add_ut_test(qa_LiveSettings qa_LiveSettings.cpp)
 target_link_libraries(qa_LiveSettings PRIVATE gr4_rwt::blocks_rwt_headers)
 target_compile_definitions(qa_LiveSettings PRIVATE GR4_RWT_TEST_DATA_DIR="${GR4_RWT_TEST_DATA_DIR}")
 
-# the Oxygen management API (connection_control), against a mock of its HTTP server
-gr4_modtool_add_ut_test(qa_RadioApi qa_RadioApi.cpp)
-target_link_libraries(qa_RadioApi PRIVATE gr4_rwt::blocks_rwt_headers)
-target_compile_definitions(qa_RadioApi PRIVATE GR4_RWT_TEST_DATA_DIR="${GR4_RWT_TEST_DATA_DIR}")
+# the RWT Hardware Manager (connection_control), against a mock of its HTTP server
+gr4_modtool_add_ut_test(qa_HardwareManager qa_HardwareManager.cpp)
+target_link_libraries(qa_HardwareManager PRIVATE gr4_rwt::blocks_rwt_headers)
+target_compile_definitions(qa_HardwareManager PRIVATE GR4_RWT_TEST_DATA_DIR="${GR4_RWT_TEST_DATA_DIR}")
 
 # loads the compiled block library and creates the blocks through the registry
 gr4_modtool_add_ut_test(qa_Registry qa_Registry.cpp)
 target_link_libraries(qa_Registry PRIVATE gr4_rwt::blocks_rwt_headers GrGr4RwtRwtBlocksShared)
 
-# runs examples/oxygen_repeater.grc with GR4's rungraph tool against the emulator
+# runs examples/rwt_repeater.grc with GR4's rungraph tool against the emulator
 get_filename_component(_gr4_prefix "${gnuradio4_DIR}/../../.." ABSOLUTE)
-option(GR4_RWT_TEST_EXAMPLE "Test examples/oxygen_repeater.grc with rungraph" ON)
+option(GR4_RWT_TEST_EXAMPLE "Test examples/rwt_repeater.grc with rungraph" ON)
 find_program(GR4_RUNGRAPH NAMES rungraph gr4-rungraph HINTS "${_gr4_prefix}/bin")
-set(GR4_RWT_TEST_EXAMPLE_FILE "${PROJECT_SOURCE_DIR}/examples/oxygen_repeater.grc" CACHE FILEPATH
-  "oxygen_repeater.grc, as seen by qa_Example")
+set(GR4_RWT_TEST_EXAMPLE_FILE "${PROJECT_SOURCE_DIR}/examples/rwt_repeater.grc" CACHE FILEPATH
+  "rwt_repeater.grc, as seen by qa_Example")
 set(GR4_RWT_TEST_PLUGIN_DIR "" CACHE PATH
   "Directory of the block library, as seen by qa_Example (default: the build tree)")
 if(GR4_RWT_TEST_PLUGIN_DIR)

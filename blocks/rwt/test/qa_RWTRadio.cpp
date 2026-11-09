@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-RWT-Hardware-Apache-2.0 OR GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Red Wire Technologies
-// qa_Oxygen.cpp — the device layer: gr-rwt wire format, rate planning, and AD9361 control on the emulator
+// qa_RWTRadio.cpp — the device layer: gr-rwt wire format, rate planning, and AD9361 control on the emulator
 #include <boost/ut.hpp>
 
 #include <gnuradio-4.0/rwt/detail/BlockSupport.hpp>
-#include <gnuradio-4.0/rwt/detail/Oxygen.hpp>
+#include <gnuradio-4.0/rwt/detail/RWTRadio.hpp>
 #include <gnuradio-4.0/rwt/detail/Wire.hpp>
 
 #include "EmuFixture.hpp"
@@ -77,8 +77,8 @@ const boost::ut::suite<"AD9361 control"> controlTests = [] {
 
     "open in remote mode and drive the AD9361 attributes"_test = [] {
         EmuFixture emu;
-        Oxygen     dev;
-        dev.open(OxygenConfig{emu.uri(), Mode::Remote, "default", false, false, 0U, true});
+        RWTRadio     dev;
+        dev.open(RWTRadioConfig{emu.uri(), Mode::Remote, "default", false, false, 0U, true});
         expect(dev.isOpen());
         expect(eq(dev.numChannels(Direction::RX), 2UZ));
         expect(eq(dev.numChannels(Direction::TX), 2UZ));
@@ -135,21 +135,21 @@ const boost::ut::suite<"AD9361 control"> controlTests = [] {
 
     "unknown attributes are reported, not fatal"_test = [] {
         EmuFixture  emu;
-        Oxygen      dev;
+        RWTRadio      dev;
         std::string lastWarning;
         dev.warn = [&lastWarning](const std::string& m) { lastWarning = m; };
-        dev.open(OxygenConfig{emu.uri(), Mode::Remote, "default", false, false, 0U, true});
+        dev.open(RWTRadioConfig{emu.uri(), Mode::Remote, "default", false, false, 0U, true});
         expect(!dev.set("no_such_attribute", "1"));
         expect(lastWarning.find("no_such_attribute") != std::string::npos);
     };
 
     "a missing fpgaloader fails local mode with the reason"_test = [] {
         EmuFixture emu;
-        Oxygen     dev;
+        RWTRadio     dev;
         bool       threw = false;
         std::string what;
         try {
-            dev.open(OxygenConfig{emu.uri(), Mode::Local, "default", true, false, 0U, true});
+            dev.open(RWTRadioConfig{emu.uri(), Mode::Local, "default", true, false, 0U, true});
         } catch (const std::exception& e) {
             threw = true;
             what  = e.what();

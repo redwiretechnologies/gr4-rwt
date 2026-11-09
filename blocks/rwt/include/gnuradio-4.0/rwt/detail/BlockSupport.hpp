@@ -7,7 +7,7 @@
 // and tag keys.
 
 #include <gnuradio-4.0/Tag.hpp>
-#include <gnuradio-4.0/rwt/detail/Oxygen.hpp>
+#include <gnuradio-4.0/rwt/detail/RWTRadio.hpp>
 
 #include <algorithm>
 #include <cinttypes>

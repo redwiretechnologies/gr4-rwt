@@ -3,12 +3,12 @@
 #ifndef GNURADIO_RWT_DETAIL_REGISTERS_HPP
 #define GNURADIO_RWT_DETAIL_REGISTERS_HPP
 
-// FPGA user registers of the RWT Oxygen "default" personality, and the
+// FPGA user registers of the RWT radios' "default" personality, and the
 // fpgaloader tool that switches personalities.
 //
 // Register map and semantics follow gr-rwt (lib/common_registers.h,
 // lib/cic_filter_fpga.h, lib/time_helper.cc). The register window is
-// memory-mapped from /dev/mem, so this works only on the Oxygen itself and
+// memory-mapped from /dev/mem, so this works only on the radio itself and
 // needs root (or CAP_SYS_RAWIO).
 
 #include <cerrno>
@@ -107,7 +107,7 @@ public:
     explicit Registers(std::uint64_t baseAddr) {
         _fd = ::open("/dev/mem", O_RDWR | O_SYNC);
         if (_fd < 0) {
-            throw std::runtime_error(std::string("could not open /dev/mem (") + std::strerror(errno) + "); local mode runs on the Oxygen as root");
+            throw std::runtime_error(std::string("could not open /dev/mem (") + std::strerror(errno) + "); local mode runs on the RWT radio itself, as root");
         }
         _mapBase = ::mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, _fd, static_cast<off_t>(baseAddr & ~kMapMask));
         if (_mapBase == MAP_FAILED) {

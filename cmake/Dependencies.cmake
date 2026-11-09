@@ -31,7 +31,7 @@ function(gr4_rwt_resolve_dependencies)
   find_package(LibIIO 1.0 REQUIRED)
   message(STATUS "libiio ${LibIIO_VERSION}: ${LibIIO_LIBRARIES}")
 
-  # --- cpp-httplib (required): the Oxygen management API ---------------------
+  # --- cpp-httplib (required): the RWT Hardware Manager ----------------------
   include(Gr4RwtHttplib)
   message(STATUS "cpp-httplib: httplib::httplib")
 

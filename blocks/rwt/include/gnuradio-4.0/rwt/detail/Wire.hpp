@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Red Wire Technologies
 //
 // Wire.hpp - wire format used by the Red Wire Technologies "default"
-// FPGA personality on the Oxygen SDR.
+// FPGA personality on RWT radios (such as the Oxygen SDR).
 //
 // This is a hardware-independent reimplementation of the framing logic in
 // gr-rwt (lib/base_device_source.cc and lib/rwt_sink_impl.cc):

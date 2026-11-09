@@ -3,7 +3,7 @@
 #ifndef GNURADIO_RWT_DETAIL_IIO_HPP
 #define GNURADIO_RWT_DETAIL_IIO_HPP
 
-// libiio v1 plumbing for the AD9361 on the RWT Oxygen: contexts, attribute
+// libiio v1 plumbing for the AD9361 on an RWT radio: contexts, attribute
 // access by the sysfs-style names gr-rwt uses, and a ring of buffer blocks.
 
 #include <iio/iio.h>

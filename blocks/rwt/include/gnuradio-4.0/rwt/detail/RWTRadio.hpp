@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-RWT-Hardware-Apache-2.0 OR GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Red Wire Technologies
-#ifndef GNURADIO_RWT_DETAIL_OXYGEN_HPP
-#define GNURADIO_RWT_DETAIL_OXYGEN_HPP
+#ifndef GNURADIO_RWT_DETAIL_RWT_RADIO_HPP
+#define GNURADIO_RWT_DETAIL_RWT_RADIO_HPP
 
-// The RWT Oxygen as one device: its libiio context and AD9361, and in local
+// An RWT radio (the Oxygen and other Red Wire Technologies SDRs) as one device: its libiio context and AD9361, and in local
 // mode the FPGA "default" personality (tags, timing, CIC decimator), set up
 // the way gr-rwt's base_device_common, time_helper and cic_filter_fpga do.
 
@@ -31,7 +31,7 @@ enum class Direction { RX, TX };
 
 /// how the sample stream is laid out
 enum class Mode {
-    Local,  ///< on the Oxygen, "default" FPGA personality: packed 64-bit words with in-band tags (gr-rwt)
+    Local,  ///< on the radio itself, "default" FPGA personality: packed 64-bit words with in-band tags (gr-rwt)
     Remote, ///< "griio" personality over libiio (iiod): standard AD9361 layout, no tags
 };
 
@@ -45,7 +45,7 @@ inline constexpr double kMinRxRateNoCic  = 2'083'334.0;
 #endif
 inline constexpr double kTxAttenuationMax = 89.75;
 
-struct OxygenConfig {
+struct RWTRadioConfig {
     std::string   uri;                 ///< libiio URI; empty means "local:"
     Mode          mode        = Mode::Local;
     std::string   personality = "default";
@@ -81,8 +81,8 @@ inline const std::multimap<std::string, std::string>& grRwtAliases() {
     return aliases;
 }
 
-class Oxygen {
-    OxygenConfig               _cfg;
+class RWTRadio {
+    RWTRadioConfig               _cfg;
     std::unique_ptr<Context>   _ctx;
     Ad9361Phy                  _phy;
     iio_device*                _rxDev = nullptr;
@@ -99,12 +99,12 @@ public:
     using Logger = std::function<void(const std::string&)>;
     Logger warn = [](const std::string&) {};
 
-    Oxygen() = default;
-    Oxygen(const Oxygen&)            = delete;
-    Oxygen& operator=(const Oxygen&) = delete;
+    RWTRadio() = default;
+    RWTRadio(const RWTRadio&)            = delete;
+    RWTRadio& operator=(const RWTRadio&) = delete;
 
     /// opens the radio; throws std::runtime_error with the reason on failure
-    void open(const OxygenConfig& cfg) {
+    void open(const RWTRadioConfig& cfg) {
         _cfg = cfg;
         if (_cfg.mode == Mode::Local && _cfg.loadFpga) {
             // gr-rwt loads the personality before touching the radio; fpgaloader leaves an
@@ -141,7 +141,7 @@ public:
     }
 
     [[nodiscard]] bool               isOpen() const noexcept { return _ctx != nullptr; }
-    [[nodiscard]] const OxygenConfig& config() const noexcept { return _cfg; }
+    [[nodiscard]] const RWTRadioConfig& config() const noexcept { return _cfg; }
     [[nodiscard]] Mode               mode() const noexcept { return _cfg.mode; }
     [[nodiscard]] bool               hasRegisters() const noexcept { return _regs != nullptr; }
     [[nodiscard]] Registers*         registers() const noexcept { return _regs.get(); }
@@ -302,4 +302,4 @@ struct RxRatePlan {
 
 } // namespace gr::rwt::detail
 
-#endif // GNURADIO_RWT_DETAIL_OXYGEN_HPP
+#endif // GNURADIO_RWT_DETAIL_RWT_RADIO_HPP

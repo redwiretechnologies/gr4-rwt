@@ -9,8 +9,8 @@
 #include <gnuradio-4.0/thread/thread_pool.hpp>
 
 #include <gnuradio-4.0/rwt/detail/BlockSupport.hpp>
-#include <gnuradio-4.0/rwt/detail/Oxygen.hpp>
-#include <gnuradio-4.0/rwt/detail/RadioApi.hpp>
+#include <gnuradio-4.0/rwt/detail/RWTRadio.hpp>
+#include <gnuradio-4.0/rwt/detail/HardwareManager.hpp>
 #include <gnuradio-4.0/rwt/detail/Streams.hpp>
 
 #include <array>
@@ -34,19 +34,19 @@ GR_REGISTER_BLOCK("gr::rwt::RWTDualSink", gr::rwt::RWTDualSink, [T], [ std::comp
 template<typename T, std::size_t nPorts = 1UZ>
 requires((std::is_same_v<T, std::complex<float>> || std::is_same_v<T, std::int16_t>) && (nPorts == 1UZ || nPorts == 2UZ))
 struct RWTSink : Block<RWTSink<T, nPorts>> {
-    using Description = Doc<R"(RWT Oxygen SDR sink (AD9361 transmitter), the GNU Radio 4 counterpart of gr-rwt's rwt_sink.
+    using Description = Doc<R"(RWT radio sink (AD9361 transmitter; the Oxygen and other Red Wire Technologies SDRs), the GNU Radio 4 counterpart of gr-rwt's rwt_sink.
 
 RWTSink transmits one channel (`channel` picks TX1 or TX2); RWTDualSink transmits both, port 0 = TX1, port 1 = TX2.
 std::complex<float> input is scaled so 1.0 is the DAC's full scale; std::int16_t input is raw interleaved I,Q.
 
-mode "local" (default when uri is empty) runs on the Oxygen with the "default" FPGA personality, as gr-rwt does, and turns
+mode "local" (default when uri is empty) runs on the radio itself with the "default" FPGA personality, as gr-rwt does, and turns
 input tags into the FPGA's in-band burst markers (GNU Radio's gr:tx_* keys, and rwt:tx_sample):
   gr:tx_sob     (true)               start of burst
   gr:tx_eob     (true)               the tagged sample is the burst's last; the burst is sent at once
   gr:tx_time    (integer ns, or s)   hold the tagged sample until this time (FPGA DAC sample index = time x sample_rate)
   rwt:tx_sample (uint64)             hold the tagged sample until this FPGA DAC sample index
 The bare spellings gr-rwt uses (tx_sob, tx_eob, tx_time, tx_sample) are read too.
-mode "remote" streams to an Oxygen running the "griio" personality over libiio (uri "ip:<host>"); there gr:tx_eob only
+mode "remote" streams to an RWT radio running the "griio" personality over libiio (uri "ip:<host>"); there gr:tx_eob only
 flushes the partial buffer and the other tags are ignored.
 
 Samples are handed to an io thread through a bounded queue, so a full DMA ring holds back the graph rather than a
@@ -58,7 +58,7 @@ by 87.5 dB, as gr-rwt does.)">;
     TPortType in;
 
     // device
-    Annotated<std::string, "uri", Visible, Doc<"libiio context URI; empty = this Oxygen (local:)">>              uri;
+    Annotated<std::string, "uri", Visible, Doc<"libiio context URI; empty = this radio (local:)">>              uri;
     Annotated<std::string, "mode", Doc<"local (default FPGA personality, tags) or remote (griio); empty = by uri">> mode;
     // RF (gr-rwt rwt_sink parameters)
     Annotated<float, "sample_rate", Unit<"Hz">, Visible, Doc<"TX sample rate (the AD9361 clock is shared with RX)">> sample_rate  = 5'000'000.f;
@@ -72,8 +72,8 @@ by 87.5 dB, as gr-rwt does.)">;
     Annotated<std::string, "filter", Doc<"AD9361 .ftr FIR file (RX and TX); used when auto_filter is off">>          filter;
     Annotated<bool, "auto_filter", Doc<"load a FIR matching the rate (libad9361)">>                                  auto_filter  = true;
     Annotated<std::string, "extra", Doc<"gr-rwt extra settings: comma-separated key=value">>                         extra;
-    // Oxygen management API (http://<radio>/docs): connection_control sets the TX frequency with the RF path's filters, and switches the TX paths on at start and off at stop
-    Annotated<std::string, "api_url", Doc<"management API base URL; empty = this Oxygen (local) or the uri's host (ip:), none = off">> api_url;
+    // RWT Hardware Manager (http://<radio>/docs): connection_control sets the TX frequency with the RF path's filters, and switches the TX paths on at start and off at stop
+    Annotated<std::string, "api_url", Doc<"RWT Hardware Manager base URL; empty = this radio (local) or the uri's host (ip:), none = off">> api_url;
     // an integer, not a string: gr-studio writes it unquoted, and GR4 refuses an integer for a string setting
     Annotated<gr::Size_t, "api_transceiver", Doc<"connection_control transceiver: N = TransceiverN (0 on an Oxygen)">>       api_transceiver = 0U;
     // FPGA ("default" personality, local mode)
@@ -99,10 +99,10 @@ by 87.5 dB, as gr-rwt does.)">;
         std::vector<detail::StreamEvent>       events;
     };
 
-    detail::Oxygen                    _dev;
+    detail::RWTRadio                    _dev;
     std::string                       _startError; // why the last start() failed; empty while it holds the radio
-    detail::RadioApi                  _api;        // the management API, when api_url resolves to one
-    std::vector<std::size_t>          _txOn;       // TX paths this block switched on through the API
+    detail::HardwareManager                  _hwm;        // the RWT Hardware Manager, when api_url resolves to one
+    detail::PathEnables               _txOn{detail::Direction::TX}; // TX paths this block switched on through the RWT Hardware Manager
     std::unique_ptr<detail::TxStream> _tx;
     std::vector<std::size_t>          _channels;
     std::atomic<double>               _rate{0.0}; // TX rate, for tx_time
@@ -162,13 +162,13 @@ by 87.5 dB, as gr-rwt does.)">;
         }
     }
 
-    /// the TX frequency through the management API's connection_control, which also sets the RF path's
-    /// filters, for each TX path the block uses; through libiio (AD9361 LO alone) without the API or if it fails
+    /// the TX frequency through the RWT Hardware Manager's connection_control, which also sets the RF path's
+    /// filters, for each TX path the block uses; through libiio (AD9361 LO alone) without the RWT Hardware Manager or if it fails
     void applyFrequency() {
-        if (_api.enabled()) {
+        if (_hwm.enabled()) {
             bool ok = true;
             for (const std::size_t ch : _channels) {
-                if (const std::string err = _api.setFrequency(detail::Direction::TX, ch, frequency); !err.empty()) {
+                if (const std::string err = _hwm.setFrequency(detail::Direction::TX, ch, frequency); !err.empty()) {
                     _dev.warn(err);
                     ok = false;
                 }
@@ -176,33 +176,19 @@ by 87.5 dB, as gr-rwt does.)">;
             if (ok) {
                 return;
             }
-            _dev.warn("the management API did not take the TX frequency; setting the AD9361 LO through libiio");
+            _dev.warn("the RWT Hardware Manager did not take the TX frequency; setting the AD9361 LO through libiio");
         }
         _dev.setLo(detail::Direction::TX, frequency);
     }
 
-    /// connection_control transmit_enable for the block's TX paths: on at start, off when the block
+    /// RWT Hardware Manager transmit_enable for the block's TX paths: on at start, off when the block
     /// stops, fails to start, or is destroyed. Only paths this block switched on are switched off.
     void setTransmit(bool on) {
-        if (!_api.enabled()) {
-            return;
-        }
         if (on) {
-            for (const std::size_t ch : _channels) {
-                if (const std::string err = _api.transmitEnable(ch, true); !err.empty()) {
-                    _dev.warn("TX" + std::to_string(ch) + " not switched on: " + err);
-                } else {
-                    _txOn.push_back(ch);
-                }
-            }
-            return;
+            _txOn.on(_hwm, _channels, [this](const std::string& msg) { _dev.warn(msg); });
+        } else {
+            _txOn.off(_hwm, [this](const std::string& msg) { std::println(stderr, "{}: {}", this->name.value, msg); });
         }
-        for (const std::size_t ch : _txOn) {
-            if (const std::string err = _api.transmitEnable(ch, false); !err.empty()) {
-                std::println(stderr, "{}: TX{} not switched off: {}", this->name.value, ch, err);
-            }
-        }
-        _txOn.clear();
     }
 
     /// a setting the radio cannot take: start() fails with it, a live change is refused (settingsChanged)
@@ -251,9 +237,9 @@ by 87.5 dB, as gr-rwt does.)">;
         try {
             const detail::Mode m = detail::parseMode(mode, uri);
             _dev.warn            = [this](const std::string& msg) { std::println(stderr, "{}: {}", this->name.value, msg); };
-            _dev.open(detail::OxygenConfig{uri, m, personality, load_fpga, force_reload, base_addr, check_blkid});
-            _api.configure(detail::resolveApiUrl(api_url, m, uri), static_cast<std::size_t>(api_transceiver.value));
-            _api.trace = [this](const std::string& msg) {
+            _dev.open(detail::RWTRadioConfig{uri, m, personality, load_fpga, force_reload, base_addr, check_blkid});
+            _hwm.configure(detail::resolveHardwareManagerUrl(api_url, m, uri), static_cast<std::size_t>(api_transceiver.value));
+            _hwm.trace = [this](const std::string& msg) {
                 if (detail::traceEnabled()) {
                     std::println(stderr, "{}: {}", this->name.value, msg);
                 }
